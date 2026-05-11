@@ -49,7 +49,7 @@ Terraform maps **`TF_VAR_<name>`** to root-module variable **`name`**. Configure
 | **`AWS_TERRAFORM_ROLE_ARN`** | _n/a_ | **Apply** job only (**manual** **`workflow_dispatch`**); default **AdministratorAccess** — narrow for prod. |
 | **`TF_VAR_DB_PASSWORD`** | `db_password` | RDS master password. |
 | **`TF_VAR_API_KEYS_JSON`** | `api_keys_json` | Single-line JSON, e.g. `{"key-value":"tenant-id"}`. |
-| **`TF_VAR_IMAGE_TAG`** | `image_tag` | Image tag (**git SHA**) pushed to **ECR**. |
+| **`TF_VAR_IMAGE_TAG`** | `image_tag` | Tag that exists in **ECR** (**`intentproof-api`** repo) — e.g. semver **`v0.2.0`** from **`intentproof-api`** **Release — Docker to ECR** workflow, or a short **git** SHA you pushed manually. |
 
 | **`TF_VAR_RDS_BACKUP_RETENTION_PERIOD`** _(optional)_ | `rds_backup_retention_period` | Omit → default **`7`**; **`0`** on many **AWS Free Tier** accounts. |
 
@@ -61,9 +61,19 @@ The **`Terraform`** workflow **apply** job uses **`environment: beta`** by defau
 
 Further OIDC knobs: **`bootstrap/github-oidc/README.md`**.
 
-## Build and push the application image
+## **`intentproof-api`** — release image to ECR (GitHub Actions)
 
-From **`intentproof-api`**, build **`linux/amd64`**, tag with the **`git`** short SHA in **`TF_VAR_IMAGE_TAG`**, authenticate to **ECR**, **`docker push`**.
+1. After **`stack`** **`apply`** (or when the IAM block is enabled), read **`terraform output -raw github_actions_api_ecr_push_role_arn`** from **`stack/`** (or the **Terraform** workflow apply summary when wired).
+2. In **`IntentProof/intentproof-api`** → **Settings → Secrets and variables → Actions**, add **`AWS_ECR_PUSH_ROLE_ARN`** with that ARN.
+3. Create and push a **semver** tag **`vX.Y.Z`** (must match **`[0-9]+.[0-9]+.[0-9]+`** after the **`v`**). The workflow **`.github/workflows/docker-ecr-release.yml`** builds **`linux/amd64`** and pushes **`ACCOUNT.dkr.ecr.REGION.amazonaws.com/intentproof-api:vX.Y.Z`**.
+4. Set **`TF_VAR_IMAGE_TAG`** in **`intentproof-infra`** to the **same** tag string (ECR is **immutable**; the tag cannot be overwritten).
+5. Run **`intentproof-infra`** **Terraform** **`apply`** (manual) to roll ECS to the new image.
+
+Disable the managed role with **`create_github_actions_api_ecr_push_role = false`** if you use a different publisher or account layout; **`github_actions_api_repository`** / **`github_actions_api_ecr_push_role_name`** adjust defaults.
+
+### Manual alternative
+
+From **`intentproof-api`**, build **`linux/amd64`**, tag with the value you will set in **`TF_VAR_IMAGE_TAG`**, authenticate to **ECR**, **`docker push`**.
 
 ---
 
