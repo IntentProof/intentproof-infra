@@ -47,15 +47,6 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "tf_state" {
   }
 }
 
-resource "aws_s3_bucket_public_access_block" "tf_state" {
-  bucket = aws_s3_bucket.tf_state.id
-
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
-
 data "aws_iam_policy_document" "tf_state_deny_insecure_transport" {
   statement {
     sid    = "DenyInsecureTransport"
@@ -77,7 +68,25 @@ data "aws_iam_policy_document" "tf_state_deny_insecure_transport" {
   }
 }
 
+# Apply before aws_s3_bucket_public_access_block: with block_public_policy=true, AWS may reject or
+# conflict with statements that use Principal "*", and Terraform can fail reading the policy back.
 resource "aws_s3_bucket_policy" "tf_state" {
   bucket = aws_s3_bucket.tf_state.id
   policy = data.aws_iam_policy_document.tf_state_deny_insecure_transport.json
+
+  depends_on = [
+    aws_s3_bucket_versioning.tf_state,
+    aws_s3_bucket_server_side_encryption_configuration.tf_state,
+  ]
+}
+
+resource "aws_s3_bucket_public_access_block" "tf_state" {
+  bucket = aws_s3_bucket.tf_state.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+
+  depends_on = [aws_s3_bucket_policy.tf_state]
 }
