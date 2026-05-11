@@ -58,6 +58,7 @@ jobs:
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_TERRAFORM_PLAN_ROLE_ARN }}
+          role-duration-seconds: 43200
           mask-aws-account-id: true
 
       - name: Setup Terraform
@@ -125,6 +126,7 @@ jobs:
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
+          role-duration-seconds: 43200
           mask-aws-account-id: true
 
       - name: Setup Terraform
