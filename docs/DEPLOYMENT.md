@@ -66,7 +66,9 @@ Further OIDC knobs: **`bootstrap/github-oidc/README.md`**.
 1. After **`stack`** **`apply`** (or when the IAM block is enabled), read **`terraform output -raw github_actions_api_ecr_push_role_arn`** from **`stack/`** (or the **Terraform** workflow apply summary when wired).
 2. In **`IntentProof/intentproof-api`** → **Settings → Secrets and variables → Actions**, add **`AWS_ECR_PUSH_ROLE_ARN`** with that ARN.
 3. Create and push a **semver** tag **`vX.Y.Z`** (must match **`[0-9]+.[0-9]+.[0-9]+`** after the **`v`**). The workflow **`.github/workflows/docker-ecr-release.yml`** builds **`linux/amd64`** and pushes **`ACCOUNT.dkr.ecr.REGION.amazonaws.com/intentproof-api:vX.Y.Z`**.
-4. Set **`TF_VAR_IMAGE_TAG`** in **`intentproof-infra`** to the **same** tag string (ECR is **immutable**; the tag cannot be overwritten).
+4. **`TF_VAR_IMAGE_TAG`** on **`intentproof-infra`** must match that tag (ECR is **immutable**). Either:
+   - **Automated (optional):** org **GitHub App** installed on **`intentproof-infra`** only (repository **Secrets** → read/write; **Metadata** → read). On **`intentproof-api`**, set **`INTENTPROOF_INFRA_GITHUB_APP_ID`** (repository variable) and **`INTENTPROOF_INFRA_GITHUB_APP_PRIVATE_KEY`** (repository secret — PEM). The **Release — Docker to ECR** workflow mints an installation token (**`actions/create-github-app-token`**) and runs **`gh secret set TF_VAR_IMAGE_TAG`** on this repo. Optional **`intentproof-api`** variables: **`INTENTPROOF_INFRA_GITHUB_APP_OWNER`**, **`INTENTPROOF_INFRA_GITHUB_APP_REPOSITORY`** (short name), **`INTENTPROOF_INFRA_REPO`** (full **`owner/name`** for **`gh --repo`**).
+   - **Manual:** set **`TF_VAR_IMAGE_TAG`** in **`intentproof-infra`** GitHub secrets to the same string.
 5. Run **`intentproof-infra`** **Terraform** **`apply`** (manual) to roll ECS to the new image.
 
 Disable the managed role with **`create_github_actions_api_ecr_push_role = false`** if you use a different publisher or account layout; **`github_actions_api_repository`** / **`github_actions_api_ecr_push_role_name`** adjust defaults.
