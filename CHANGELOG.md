@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **`bootstrap/github-oidc`:** **`create_github_oidc_provider`** / **`existing_github_oidc_provider_arn`** for **409 EntityAlreadyExists** when GitHub’s OIDC URL is already registered; **`moved`** from **`aws_iam_openid_connect_provider.github`** to **`…github[0]`**; **`terraform-bootstrap.yml`** inputs to pass reuse flags from Actions.
 - **Bootstrap cold path (Terraform ≥ 1.10):** **`terraform-bootstrap.yml`** no longer uses **`init -backend=false`** (plan/apply fail while **`backend "s3" {}`** is declared). Cold **`provision_new_and_migrate`** temporarily sets **`backend "local" {}`**, runs **`terraform init`**, then **`git checkout -- main.tf`** before **`init -migrate-state`**; **`bootstrap/README.md`**, **`bootstrap/github-oidc/README.md`**, and **`docs/DEPLOYMENT.md`** CLI parity updated.
 - **Bootstrap S3:** apply **`aws_s3_bucket_policy`** (TLS deny) **before** **`aws_s3_bucket_public_access_block`** — **`block_public_policy=true`** can reject or break policies using **`Principal "*"`**, causing **`reading S3 Bucket Policy ... couldn't find resource`** on apply.
 - **Migrate state → S3 in CI:** **`init -migrate-state`** cannot use **`-input=false`** / job **`TF_INPUT=false`** (Terraform needs to confirm backend change); migrate step sets **`TF_INPUT=true`**, drops **`-input=false`**, and avoids **`pipefail`** treating **`yes`** SIGPIPE as failure.

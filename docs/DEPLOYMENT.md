@@ -15,7 +15,8 @@ Use **branch `main`** (or **`master`**); bootstrap workflows only run those refs
 
 2. **Actions → Terraform bootstrap** — target **`bootstrap`**, **credential_source** **`static_credentials`**, **state_behavior** **`provision_new_and_migrate`**, **run_apply** ✅ (required once). Confirm **state_bucket_name** equals **`bucket`** in **`stack/main.tf`**.
 
-3. **Actions → Terraform bootstrap** — target **`github-oidc`**, **static_credentials** again, **`provision_new_and_migrate`**, **run_apply** ✅. Pick **state_bucket_name** unchanged. **`TF_VAR_github_*`** defaults come from **`github.repository_owner`** and **`github.event.repository.name`**. The workflow exports **`TF_VAR_terraform_state_bucket_name`** from the same **state_bucket_name** input so the **plan** IAM role’s S3 policy matches the real backend bucket.
+3. **Actions → Terraform bootstrap** — target **`github-oidc`**, **static_credentials** again, **`provision_new_and_migrate`**, **run_apply** ✅. Pick **state_bucket_name** unchanged. **`TF_VAR_github_*`** defaults come from **`github.repository_owner`** and **`github.event.repository.name`**. The workflow exports **`TF_VAR_terraform_state_bucket_name`** from the same **state_bucket_name** input so the **plan** IAM role’s S3 policy matches the real backend bucket.  
+   If **`apply`** fails with **409** / **`EntityAlreadyExists`** for **`token.actions.githubusercontent.com`**, the GitHub OIDC URL is already registered in IAM — either **`terraform import`** the provider into state (see **`bootstrap/github-oidc/README.md`**) or rerun bootstrap with **`create_github_oidc_provider`** unchecked and **`existing_github_oidc_provider_arn`** set to that provider’s ARN.
 
 4. From the **`github-oidc`** run **summary**, copy:
    - **`github_terraform_plan_role_arn`** → repository secret **`AWS_TERRAFORM_PLAN_ROLE_ARN`** (used for **`fmt` / `validate` / `plan`** on PR and push).

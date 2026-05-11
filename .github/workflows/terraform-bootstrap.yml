@@ -48,6 +48,18 @@ on:
           so AWS resources exist before state migration runs.
         type: boolean
         default: false
+      create_github_oidc_provider:
+        description: >-
+          github-oidc only — leave enabled unless IAM already registers token.actions.githubusercontent.com (409).
+          If disabled, set existing_github_oidc_provider_arn to that OIDC provider ARN.
+        type: boolean
+        default: true
+      existing_github_oidc_provider_arn:
+        description: >-
+          github-oidc only — required when create_github_oidc_provider is false (full ARN, e.g.
+          arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com).
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -144,6 +156,30 @@ jobs:
             echo "TF_VAR_github_repo=${GH_REPO_NAME}" >> "$GITHUB_ENV"
             echo "TF_VAR_github_actions_environment=${GH_ENV}" >> "$GITHUB_ENV"
             echo "TF_VAR_terraform_state_bucket_name=${STATE_BUCKET}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Export github-oidc OIDC provider reuse (409 / drift)
+        if: inputs.target == 'github-oidc'
+        env:
+          CREATE_PROV: ${{ inputs.create_github_oidc_provider }}
+          EXISTING_ARN: ${{ inputs.existing_github_oidc_provider_arn }}
+        run: |
+          set -euo pipefail
+          forbid_injection() {
+            local name="$1" val="$2"
+            if [[ "${val}" == *$'\n'* || "${val}" == *$'\r'* || "${val}" == *"="* ]]; then
+              echo "::error::$name must not contain newlines, carriage returns, or equals signs (GITHUB_ENV safety)" >&2
+              exit 1
+            fi
+          }
+          if [ "${CREATE_PROV}" != "true" ]; then
+            echo "TF_VAR_create_github_oidc_provider=false" >> "$GITHUB_ENV"
+            if [ -z "${EXISTING_ARN}" ]; then
+              echo "::error::When create_github_oidc_provider is false, set workflow input existing_github_oidc_provider_arn (full IAM OIDC provider ARN)." >&2
+              exit 1
+            fi
+            forbid_injection "existing_github_oidc_provider_arn" "${EXISTING_ARN}"
+            echo "TF_VAR_existing_github_oidc_provider_arn=${EXISTING_ARN}" >> "$GITHUB_ENV"
           fi
 
       - name: Terraform format (check)

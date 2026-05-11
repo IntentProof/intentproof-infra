@@ -9,6 +9,19 @@ IAM **OIDC identity provider** for `token.actions.githubusercontent.com` plus **
 
 **Ordering:** **`../bootstrap/`** (**S3 bucket**) must **`apply`** first so the backend bucket exists. Then run **Actions → Terraform bootstrap** (**target **`github-oidc`**) **`provision_new_and_migrate`** (**first time**) **`static_credentials`**, **`run_apply`** true.
 
+### `EntityAlreadyExists` (409) — OIDC URL already in the account
+
+AWS allows **one** IAM OIDC provider for **`https://token.actions.githubusercontent.com`**. If remote state is empty or you **import** roles only, **`apply`** may try to **create** the provider again and fail with **409**.
+
+**Option A — Terraform owns the provider:** import it once, then **`apply`**:
+
+```bash
+terraform import 'aws_iam_openid_connect_provider.github[0]' \
+  'arn:aws:iam::ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com'
+```
+
+**Option B — Provider already exists and should not be recreated:** set **`create_github_oidc_provider`** **`false`** and **`existing_github_oidc_provider_arn`** to that provider’s ARN. In **Terraform bootstrap**, disable **`create_github_oidc_provider`** and paste the ARN into **`existing_github_oidc_provider_arn`**, or set repository **`TF_VAR_*`** equivalents.
+
 ## Prerequisites
 
 - Terraform **≥ 1.10**
@@ -16,7 +29,7 @@ IAM **OIDC identity provider** for `token.actions.githubusercontent.com` plus **
 
 GitHub-derived inputs (**`repository_owner`**, **`github.event.repository.name`**) populate **`TF_VAR_github_org`** / **`TF_VAR_github_repo`** automatically in **`terraform-bootstrap.yml`**. **`terraform-bootstrap.yml`** also sets **`TF_VAR_terraform_state_bucket_name`** from **`state_bucket_name`** when applying **`github-oidc`**, so the plan role’s **S3** policy matches the backend bucket.
 
-Optional **`-var` overrides:** **`github_actions_environment`**, **`role_name`**, **`plan_role_name`**, **`terraform_state_bucket_name`**, **`subject_claims_override`**, **`managed_policy_arns`**, **`plan_managed_policy_arns`**.
+Optional **`-var` overrides:** **`github_actions_environment`**, **`role_name`**, **`plan_role_name`**, **`terraform_state_bucket_name`**, **`subject_claims_override`**, **`managed_policy_arns`**, **`plan_managed_policy_arns`**, **`create_github_oidc_provider`**, **`existing_github_oidc_provider_arn`** (when **not** creating the provider).
 
 Cold **CLI parity** (**after** **`../`** created the bucket):
 

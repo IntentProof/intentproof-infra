@@ -32,6 +32,26 @@ variable "additional_thumbprints" {
   default     = []
 }
 
+variable "create_github_oidc_provider" {
+  description = <<-EOT
+    Set false when https://token.actions.githubusercontent.com is already registered in this AWS account
+    (EntityAlreadyExists / 409). Then set existing_github_oidc_provider_arn.
+  EOT
+  type        = bool
+  default     = true
+}
+
+variable "existing_github_oidc_provider_arn" {
+  description = "Required when create_github_oidc_provider is false — full ARN from IAM identity providers or `aws iam list-open-id-connect-providers`."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.create_github_oidc_provider || (var.existing_github_oidc_provider_arn != null && length(trimspace(var.existing_github_oidc_provider_arn)) > 0)
+    error_message = "When create_github_oidc_provider is false, existing_github_oidc_provider_arn must be a non-empty ARN."
+  }
+}
+
 variable "role_name" {
   description = "IAM role name for applies (merge + manual dispatch) — GitHub secret AWS_TERRAFORM_ROLE_ARN"
   type        = string
