@@ -54,7 +54,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Configure AWS credentials (OIDC — plan role)
-        uses: aws-actions/configure-aws-credentials@ece592f22d21d48dadb509c5e6c854c068e3f272 # v4.1.6
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_TERRAFORM_PLAN_ROLE_ARN }}
@@ -121,7 +121,7 @@ jobs:
           path: stack
 
       - name: Configure AWS credentials (OIDC — apply role)
-        uses: aws-actions/configure-aws-credentials@ece592f22d21d48dadb509c5e6c854c068e3f272 # v4.1.6
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
