@@ -27,13 +27,13 @@ Use **branch `main`** (or **`master`**); bootstrap workflows only run those refs
 
 7. **Actions → Terraform** (**`stack/`**) **`plan`/`apply`** as documented below.
 
-If you intentionally keep CloudShell/AWS Console for bootstrap, **`terraform`** **CLI** for these modules follows the same **`init -backend=false` → migrate** pattern documented in **`bootstrap/README.md`** and **`bootstrap/github-oidc/README.md`**.
+If you intentionally keep CloudShell/AWS Console for bootstrap, **`terraform`** **CLI** for these modules follows the same **temporary `backend "local"` → `init` → apply → restore `main.tf` → `init -migrate-state`** pattern documented in **`bootstrap/README.md`** and **`bootstrap/github-oidc/README.md`**.
 
 ### Cold path vs steady state (**state_behavior**)
 
 | **`state_behavior`** | When |
 |----------------------|------|
-| **`provision_new_and_migrate`** | No **S3** state yet (or migrating off pure local **`terraform.tfstate`**). Performs **`init -backend=false`**, **`apply`**, then **`init -migrate-state`** into **`state_bucket_name`**. **`run_apply` must be ✅** once so migration has real resources/state. |
+| **`provision_new_and_migrate`** | No **S3** state yet (or migrating off pure local **`terraform.tfstate`**). CI rewrites **`backend "s3" {}`** to **`backend "local" {}`**, **`terraform init`**, plan/**`apply`**, restores **`main.tf`**, then **`init -migrate-state`** into **`state_bucket_name`**. **`run_apply` must be ✅** once so migration has real resources/state. |
 | **`existing_remote`** | Default for routine updates; assumes state already stored under **`bootstrap/remote-state/`** or **`bootstrap/github-oidc/`**. |
 
 Do **not** run **`provision_new_and_migrate`** twice unless you intentionally understand state resets (risk of duplicate IAM/S3 churn).

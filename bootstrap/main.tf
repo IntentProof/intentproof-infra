@@ -8,8 +8,9 @@ terraform {
     }
   }
 
-  # Partial backend: first-time GitHub bootstrap uses `terraform init -backend=false`, then
-  # `apply`, then `init -migrate-state` with -backend-config (see .github/workflows/terraform-bootstrap.yml).
+  # Partial backend: steady state uses S3 (`terraform init` with -backend-config in CI). Cold
+  # account: `.github/workflows/terraform-bootstrap.yml` rewrites this line to `backend "local" {}`
+  # until the state bucket exists, then restores this file and runs `init -migrate-state`.
   backend "s3" {}
 }
 

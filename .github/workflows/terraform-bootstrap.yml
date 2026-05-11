@@ -14,7 +14,7 @@ on:
           - github-oidc
       state_behavior:
         description: >-
-          Cold account — provision_new_and_migrate: "-backend=false" plan/apply/migrate state into S3 under this bucket.
+          Cold account — provision_new_and_migrate: temporary local backend in main.tf, plan/apply, then migrate state into S3 under this bucket.
           Day-2 — existing_remote: state already in S3 (normal plans/applies).
         type: choice
         default: existing_remote
@@ -180,10 +180,21 @@ jobs:
         run: terraform apply -input=false -auto-approve tfplan
 
       # --- Cold path: ephemeral local tfstate → apply → migrate to S3 -----------
-      - name: Terraform init (local backend, cold path)
+      # Terraform 1.10+ does not run plan/apply after `init -backend=false` when the root
+      # declares `backend "s3" {}` (it still requires S3 backend init). The bucket does not
+      # exist yet, so we temporarily rewrite to `backend "local" {}`, init, plan/apply, then
+      # `git checkout -- main.tf` before `init -migrate-state` to S3.
+      - name: Cold path — local backend + terraform init
         if: inputs.state_behavior == 'provision_new_and_migrate'
         working-directory: ${{ steps.ctx.outputs.working_directory }}
-        run: terraform init -input=false -backend=false
+        run: |
+          set -euo pipefail
+          if ! grep -Fq 'backend "s3" {}' main.tf; then
+            echo '::error::Cold bootstrap expects a single-line `backend "s3" {}` block in main.tf (see workflow comment).' >&2
+            exit 1
+          fi
+          sed -i 's/backend "s3" {}/backend "local" {}/' main.tf
+          terraform init -input=false
 
       - name: Terraform validate (local backend)
         if: inputs.state_behavior == 'provision_new_and_migrate'
@@ -201,6 +212,12 @@ jobs:
           inputs.run_apply == true
         working-directory: ${{ steps.ctx.outputs.working_directory }}
         run: terraform apply -input=false -auto-approve tfplan
+
+      - name: Restore S3 backend block (before state migration)
+        if: >
+          inputs.state_behavior == 'provision_new_and_migrate' &&
+          inputs.run_apply == true
+        run: git checkout -- "${{ steps.ctx.outputs.working_directory }}/main.tf"
 
       - name: Migrate terraform state → S3
         if: >

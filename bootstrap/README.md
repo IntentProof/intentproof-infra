@@ -11,7 +11,7 @@ Recommended: **GitHub Actions → Terraform bootstrap** (**see [`docs/DEPLOYMENT
 - Terraform **≥ 1.10**
 - Credentials that can **`s3:*`** on the eventual state bucket (**`AWS_BOOTSTRAP_*`** cold path or **`AWS_TERRAFORM_ROLE_ARN`** afterward).
 
-This module declares **`backend "s3"` {}`; **CLI `terraform init`** must pass **`-backend-config=…`** (steady state), **`-backend=false`** plus a later **`init -migrate-state`** (cold first apply), **or use the **`Terraform bootstrap`** workflow.
+This module declares **`backend "s3"` {}`; **steady state:** **`terraform init`** with **`-backend-config=…`**. **Cold first apply** (no bucket yet): temporarily change that line to **`backend "local" {}`**, **`terraform init`**, plan/apply, restore **`main.tf`**, then **`init -migrate-state`** (see **Cold CLI path** below), **or use the **`Terraform bootstrap`** workflow** (it performs the rewrite automatically).
 
 ## Bucket name collision
 
@@ -22,9 +22,14 @@ S3 names are global. Override **`TF_VAR_state_bucket_name`** or **`-var 'state_b
 ```bash
 cd bootstrap
 
-terraform init -input=false -backend=false
+# Terraform 1.10+ cannot plan/apply with `init -backend=false` while `backend "s3" {}` is declared.
+# Use a real local backend until the bucket exists, then migrate to S3.
+sed -i 's/backend "s3" {}/backend "local" {}/' main.tf   # GNU sed (Linux). On macOS: sed -i '' 's/.../.../' main.tf
+terraform init -input=false
 terraform plan
 terraform apply   # bucket + policy exist
+
+git checkout -- main.tf
 
 REGION=us-east-1
 BUCKET=intentproof-tf-state

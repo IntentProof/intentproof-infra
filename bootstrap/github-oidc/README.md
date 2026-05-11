@@ -23,7 +23,8 @@ Cold **CLI parity** (**after** **`../`** created the bucket):
 ```bash
 cd bootstrap/github-oidc
 
-terraform init -input=false -backend=false
+sed -i 's/backend "s3" {}/backend "local" {}/' main.tf   # GNU sed; macOS: sed -i '' 's/.../.../' main.tf
+terraform init -input=false
 terraform plan \
   -var="aws_region=us-east-1" \
   -var="github_org=YOUR_ORG" \
@@ -31,6 +32,8 @@ terraform plan \
   -var="github_actions_environment=beta"
 
 terraform apply -input=false ...
+
+git checkout -- main.tf
 
 REGION=us-east-1
 BUCKET=intentproof-tf-state

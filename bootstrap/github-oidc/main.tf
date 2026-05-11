@@ -12,8 +12,8 @@ terraform {
     }
   }
 
-  # Partial backend: run `bootstrap/` (S3 state bucket) first. First apply here may use
-  # `init -backend=false` then migrate (see .github/workflows/terraform-bootstrap.yml).
+  # Partial backend: S3 in steady state; cold bootstrap rewrites to local backend in CI until
+  # migrate-state (see `.github/workflows/terraform-bootstrap.yml`).
   backend "s3" {}
 }
 
