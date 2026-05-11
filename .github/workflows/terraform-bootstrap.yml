@@ -224,14 +224,23 @@ jobs:
           inputs.state_behavior == 'provision_new_and_migrate' &&
           inputs.run_apply == true
         working-directory: ${{ steps.ctx.outputs.working_directory }}
+        env:
+          # Job default TF_INPUT=false blocks the backend migration confirmation prompt.
+          TF_INPUT: "true"
         run: |
           set -euo pipefail
-          yes | terraform init -input=false -migrate-state \
+          # Do not pass -input=false: migrate-state must accept the "local → S3" move (stdin).
+          # Avoid pipefail on `yes | …`: when terraform exits 0, `yes` often dies with SIGPIPE (141).
+          set +o pipefail
+          yes | terraform init -migrate-state \
             -backend-config="bucket=${{ steps.ctx.outputs.bucket }}" \
             -backend-config="key=${{ steps.ctx.outputs.state_key }}" \
             -backend-config="region=${AWS_REGION}" \
             -backend-config="encrypt=true" \
             -backend-config="use_lockfile=true"
+          tf_init_ec=${PIPESTATUS[1]}
+          set -o pipefail
+          exit "$tf_init_ec"
 
       - name: GitHub Actions Terraform OIDC role ARNs
         if: inputs.target == 'github-oidc' && inputs.run_apply == true

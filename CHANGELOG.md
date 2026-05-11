@@ -3,6 +3,7 @@
 ## Unreleased
 
 - **Bootstrap cold path (Terraform ≥ 1.10):** **`terraform-bootstrap.yml`** no longer uses **`init -backend=false`** (plan/apply fail while **`backend "s3" {}`** is declared). Cold **`provision_new_and_migrate`** temporarily sets **`backend "local" {}`**, runs **`terraform init`**, then **`git checkout -- main.tf`** before **`init -migrate-state`**; **`bootstrap/README.md`**, **`bootstrap/github-oidc/README.md`**, and **`docs/DEPLOYMENT.md`** CLI parity updated.
+- **Migrate state → S3 in CI:** **`init -migrate-state`** cannot use **`-input=false`** / job **`TF_INPUT=false`** (Terraform needs to confirm backend change); migrate step sets **`TF_INPUT=true`**, drops **`-input=false`**, and avoids **`pipefail`** treating **`yes`** SIGPIPE as failure.
 - **OIDC split roles:** **`bootstrap/github-oidc`** adds a **plan** IAM role (PR / branch plans) and a stricter **apply** role; **`terraform.yml`** uses **`AWS_TERRAFORM_PLAN_ROLE_ARN`** for **`plan`** and **`AWS_TERRAFORM_ROLE_ARN`** for gated **`apply`** (saved **`tfplan`** artifact).
 - **Bootstrap hardening:** **`terraform-bootstrap.yml`** rejects unsafe characters in workflow inputs before **`GITHUB_ENV`** writes; passes **`TF_VAR_terraform_state_bucket_name`** into **`github-oidc`** so state-bucket IAM matches **`state_bucket_name`**.
 - **`stack` ALB:** **`alb_accept_http`** (default **`true`**) — set **`false`** to drop **`:80`** listener and matching security-group ingress (HTTPS-only ALB).

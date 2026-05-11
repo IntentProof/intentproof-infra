@@ -38,7 +38,9 @@ git checkout -- main.tf
 REGION=us-east-1
 BUCKET=intentproof-tf-state
 
-yes | terraform init -input=false -migrate-state \
+# Migration confirms backend change; avoid TF_INPUT=false / -input=false for this init.
+export TF_INPUT=true
+yes | terraform init -migrate-state \
   -backend-config="bucket=${BUCKET}" \
   -backend-config="key=bootstrap/github-oidc/terraform.tfstate" \
   -backend-config="region=${REGION}" \
