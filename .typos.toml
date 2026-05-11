@@ -1,0 +1,9 @@
+# Typos — https://github.com/crate-ci/typos
+# CI: .github/workflows/typos.yml
+
+[files]
+extend-exclude = [
+  ".terraform/**",
+  "*.tfstate",
+  "*.tfstate.backup",
+]

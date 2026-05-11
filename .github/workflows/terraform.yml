@@ -1,0 +1,147 @@
+name: Terraform
+
+on:
+  pull_request:
+    branches: [main, master]
+    paths:
+      - "stack/**"
+      - ".github/workflows/terraform.yml"
+  push:
+    branches: [main, master]
+    paths:
+      - "stack/**"
+      - ".github/workflows/terraform.yml"
+  workflow_dispatch:
+    inputs:
+      run_apply:
+        description: "After plan, run terraform apply (explicit opt-in; merges to main never auto-apply)."
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: read
+  actions: read
+
+concurrency:
+  group: intentproof-terraform-${{ github.repository }}
+  cancel-in-progress: false
+
+env:
+  TF_IN_AUTOMATION: true
+  AWS_REGION: us-east-1
+  TF_INPUT: "false"
+  TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+  TF_VAR_api_keys_json: ${{ secrets.TF_VAR_API_KEYS_JSON }}
+  TF_VAR_image_tag: ${{ secrets.TF_VAR_IMAGE_TAG }}
+
+jobs:
+  plan:
+    name: Terraform plan (stack)
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    # Fork PRs do not receive repository secrets; skip to avoid failing plans.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+
+    defaults:
+      run:
+        working-directory: stack
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Configure AWS credentials (OIDC — plan role)
+        uses: aws-actions/configure-aws-credentials@ece592f22d21d48dadb509c5e6c854c068e3f272 # v4.1.6
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_TERRAFORM_PLAN_ROLE_ARN }}
+          mask-aws-account-id: true
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: "1.10.6"
+          terraform_wrapper: false
+
+      - name: Optional RDS backup retention override
+        run: |
+          v="${{ secrets.TF_VAR_RDS_BACKUP_RETENTION_PERIOD }}"
+          if [ -n "$v" ]; then
+            echo "TF_VAR_rds_backup_retention_period=$v" >> "$GITHUB_ENV"
+          fi
+
+      - name: Terraform format (check)
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Terraform plan
+        run: terraform plan -input=false -out=tfplan
+
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-stack
+          path: stack/tfplan
+          if-no-files-found: error
+          retention-days: 7
+
+  apply:
+    name: Terraform apply (stack)
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    needs: plan
+    if: >
+      github.event_name == 'workflow_dispatch' &&
+      inputs.run_apply == true &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    # Must match TF_VAR_github_actions_environment / bootstrap/github-oidc trust "environment:<name>"
+    environment: beta
+
+    defaults:
+      run:
+        working-directory: stack
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Download plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-stack
+          path: stack
+
+      - name: Configure AWS credentials (OIDC — apply role)
+        uses: aws-actions/configure-aws-credentials@ece592f22d21d48dadb509c5e6c854c068e3f272 # v4.1.6
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
+          mask-aws-account-id: true
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: "1.10.6"
+          terraform_wrapper: false
+
+      - name: Optional RDS backup retention override
+        run: |
+          v="${{ secrets.TF_VAR_RDS_BACKUP_RETENTION_PERIOD }}"
+          if [ -n "$v" ]; then
+            echo "TF_VAR_rds_backup_retention_period=$v" >> "$GITHUB_ENV"
+          fi
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Terraform apply (saved plan only)
+        run: terraform apply -input=false -auto-approve tfplan

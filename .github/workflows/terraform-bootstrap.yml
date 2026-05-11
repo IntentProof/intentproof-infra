@@ -1,0 +1,237 @@
+# One-time / rare bootstrap: S3 backend bucket (bootstrap/) and GitHub OIDC + IAM role (bootstrap/github-oidc/).
+# See docs/DEPLOYMENT.md ("Bootstrap via GitHub Actions").
+
+name: Terraform bootstrap
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Bootstrap module"
+        type: choice
+        options:
+          - bootstrap
+          - github-oidc
+      state_behavior:
+        description: >-
+          Cold account — provision_new_and_migrate: "-backend=false" plan/apply/migrate state into S3 under this bucket.
+          Day-2 — existing_remote: state already in S3 (normal plans/applies).
+        type: choice
+        default: existing_remote
+        options:
+          - existing_remote
+          - provision_new_and_migrate
+      credential_source:
+        description: >-
+          Before AWS_TERRAFORM_ROLE_ARN exists, choose static_credentials and set secrets
+          AWS_BOOTSTRAP_ACCESS_KEY_ID / AWS_BOOTSTRAP_SECRET_ACCESS_KEY on this repo only; delete when done.
+        type: choice
+        default: oidc
+        options:
+          - oidc
+          - static_credentials
+      aws_region:
+        description: Region for this module (must match intentproof-infra/stack backend region when sharing the bucket).
+        type: string
+        default: "us-east-1"
+      state_bucket_name:
+        description: Bucket for bootstrap + stack remote state keys (must match stack/main.tf backend bucket).
+        type: string
+        default: "intentproof-tf-state"
+      github_actions_environment:
+        description: GitHub Environment embedded in OIDC trust (target github-oidc only).
+        type: string
+        default: "beta"
+      run_apply:
+        description: >-
+          Run apply after plan. For provision_new_and_migrate cold path, checking this is required at least once
+          so AWS resources exist before state migration runs.
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: intentproof-bootstrap-${{ github.repository }}-${{ inputs.target }}
+  cancel-in-progress: false
+
+env:
+  TF_IN_AUTOMATION: true
+  TF_INPUT: "false"
+
+jobs:
+  bootstrap:
+    name: Bootstrap (${{ inputs.target }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Resolve working directory & backend key
+        id: ctx
+        run: |
+          echo "bucket=${{ inputs.state_bucket_name }}" >> "$GITHUB_OUTPUT"
+          if [ "${{ inputs.target }}" = "bootstrap" ]; then
+            echo "working_directory=bootstrap" >> "$GITHUB_OUTPUT"
+            echo "state_key=bootstrap/remote-state/terraform.tfstate" >> "$GITHUB_OUTPUT"
+          else
+            echo "working_directory=bootstrap/github-oidc" >> "$GITHUB_OUTPUT"
+            echo "state_key=bootstrap/github-oidc/terraform.tfstate" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure AWS credentials (IAM user — cold start before OIDC exists)
+        if: inputs.credential_source == 'static_credentials'
+        uses: aws-actions/configure-aws-credentials@ece592f22d21d48dadb509c5e6c854c068e3f272 # v4.1.6
+        with:
+          aws-region: ${{ inputs.aws_region }}
+          aws-access-key-id: ${{ secrets.AWS_BOOTSTRAP_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_BOOTSTRAP_SECRET_ACCESS_KEY }}
+
+      - name: Configure AWS credentials (OIDC)
+        if: inputs.credential_source == 'oidc'
+        uses: aws-actions/configure-aws-credentials@ece592f22d21d48dadb509c5e6c854c068e3f272 # v4.1.6
+        with:
+          aws-region: ${{ inputs.aws_region }}
+          role-to-assume: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
+          mask-aws-account-id: true
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: "1.10.6"
+          terraform_wrapper: false
+
+      - name: Export TF_VAR_* for Terraform
+        env:
+          AWS_REGION_INPUT: ${{ inputs.aws_region }}
+          STATE_BUCKET: ${{ inputs.state_bucket_name }}
+          GH_OWNER: ${{ github.repository_owner }}
+          GH_REPO_NAME: ${{ github.event.repository.name }}
+          GH_ENV: ${{ inputs.github_actions_environment }}
+          TARGET_INPUT: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+          forbid_injection() {
+            local name="$1" val="$2"
+            if [[ "${val}" == *$'\n'* || "${val}" == *$'\r'* || "${val}" == *"="* ]]; then
+              echo "::error::$name must not contain newlines, carriage returns, or equals signs (GITHUB_ENV safety)" >&2
+              exit 1
+            fi
+          }
+          forbid_injection "aws_region" "${AWS_REGION_INPUT}"
+          forbid_injection "state_bucket_name" "${STATE_BUCKET}"
+          forbid_injection "github_actions_environment" "${GH_ENV}"
+          forbid_injection "github_org" "${GH_OWNER}"
+          forbid_injection "github_repo" "${GH_REPO_NAME}"
+
+          {
+            echo "AWS_REGION=${AWS_REGION_INPUT}"
+            echo "TF_VAR_aws_region=${AWS_REGION_INPUT}"
+          } >> "$GITHUB_ENV"
+          if [ "${TARGET_INPUT}" = "bootstrap" ]; then
+            echo "TF_VAR_state_bucket_name=${STATE_BUCKET}" >> "$GITHUB_ENV"
+          else
+            echo "TF_VAR_github_org=${GH_OWNER}" >> "$GITHUB_ENV"
+            echo "TF_VAR_github_repo=${GH_REPO_NAME}" >> "$GITHUB_ENV"
+            echo "TF_VAR_github_actions_environment=${GH_ENV}" >> "$GITHUB_ENV"
+            echo "TF_VAR_terraform_state_bucket_name=${STATE_BUCKET}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Terraform format (check)
+        working-directory: ${{ steps.ctx.outputs.working_directory }}
+        run: terraform fmt -check -recursive
+
+      # --- Existing state in S3 -------------------------------------------------
+      - name: Terraform init (S3 backend)
+        if: inputs.state_behavior == 'existing_remote'
+        working-directory: ${{ steps.ctx.outputs.working_directory }}
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=${{ steps.ctx.outputs.bucket }}" \
+            -backend-config="key=${{ steps.ctx.outputs.state_key }}" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="encrypt=true" \
+            -backend-config="use_lockfile=true"
+
+      - name: Terraform validate (S3 backend)
+        if: inputs.state_behavior == 'existing_remote'
+        working-directory: ${{ steps.ctx.outputs.working_directory }}
+        run: terraform validate
+
+      - name: Terraform plan (S3 backend)
+        if: inputs.state_behavior == 'existing_remote'
+        working-directory: ${{ steps.ctx.outputs.working_directory }}
+        run: terraform plan -input=false -out=tfplan
+
+      - name: Terraform apply (S3 backend)
+        if: >
+          inputs.state_behavior == 'existing_remote' &&
+          inputs.run_apply == true
+        working-directory: ${{ steps.ctx.outputs.working_directory }}
+        run: terraform apply -input=false -auto-approve tfplan
+
+      # --- Cold path: ephemeral local tfstate → apply → migrate to S3 -----------
+      - name: Terraform init (local backend, cold path)
+        if: inputs.state_behavior == 'provision_new_and_migrate'
+        working-directory: ${{ steps.ctx.outputs.working_directory }}
+        run: terraform init -input=false -backend=false
+
+      - name: Terraform validate (local backend)
+        if: inputs.state_behavior == 'provision_new_and_migrate'
+        working-directory: ${{ steps.ctx.outputs.working_directory }}
+        run: terraform validate
+
+      - name: Terraform plan (local backend)
+        if: inputs.state_behavior == 'provision_new_and_migrate'
+        working-directory: ${{ steps.ctx.outputs.working_directory }}
+        run: terraform plan -input=false -out=tfplan
+
+      - name: Terraform apply (local backend — creates AWS resources once)
+        if: >
+          inputs.state_behavior == 'provision_new_and_migrate' &&
+          inputs.run_apply == true
+        working-directory: ${{ steps.ctx.outputs.working_directory }}
+        run: terraform apply -input=false -auto-approve tfplan
+
+      - name: Migrate terraform state → S3
+        if: >
+          inputs.state_behavior == 'provision_new_and_migrate' &&
+          inputs.run_apply == true
+        working-directory: ${{ steps.ctx.outputs.working_directory }}
+        run: |
+          set -euo pipefail
+          yes | terraform init -input=false -migrate-state \
+            -backend-config="bucket=${{ steps.ctx.outputs.bucket }}" \
+            -backend-config="key=${{ steps.ctx.outputs.state_key }}" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="encrypt=true" \
+            -backend-config="use_lockfile=true"
+
+      - name: GitHub Actions Terraform OIDC role ARNs
+        if: inputs.target == 'github-oidc' && inputs.run_apply == true
+        working-directory: bootstrap/github-oidc
+        run: |
+          {
+            echo "### OIDC IAM roles (repository secrets)"
+            echo
+            echo "**AWS_TERRAFORM_PLAN_ROLE_ARN** (plans on PR / push)"
+            echo
+            echo '```'
+            terraform output -raw github_terraform_plan_role_arn
+            echo '```'
+            echo
+            echo "**AWS_TERRAFORM_ROLE_ARN** (writes / apply — use with protected Environment matching \`TF_VAR_github_actions_environment\`)"
+            echo
+            echo '```'
+            terraform output -raw github_terraform_role_arn
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

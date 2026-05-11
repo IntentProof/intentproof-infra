@@ -1,0 +1,10 @@
+# Changelog
+
+## Unreleased
+
+- **OIDC split roles:** **`bootstrap/github-oidc`** adds a **plan** IAM role (PR / branch plans) and a stricter **apply** role; **`terraform.yml`** uses **`AWS_TERRAFORM_PLAN_ROLE_ARN`** for **`plan`** and **`AWS_TERRAFORM_ROLE_ARN`** for gated **`apply`** (saved **`tfplan`** artifact).
+- **Bootstrap hardening:** **`terraform-bootstrap.yml`** rejects unsafe characters in workflow inputs before **`GITHUB_ENV`** writes; passes **`TF_VAR_terraform_state_bucket_name`** into **`github-oidc`** so state-bucket IAM matches **`state_bucket_name`**.
+- **`stack` ALB:** **`alb_accept_http`** (default **`true`**) — set **`false`** to drop **`:80`** listener and matching security-group ingress (HTTPS-only ALB).
+- **Bootstrap via GitHub:** **`.github/workflows/terraform-bootstrap.yml`** (**`workflow_dispatch`**; **`bootstrap`** / **`github-oidc`**; **`credential_source`** **`static_credentials`** or **`oidc`**; **`state_behavior`** **`provision_new_and_migrate`** vs **`existing_remote`**); **`bootstrap/`** and **`bootstrap/github-oidc/`** partial **`backend "s3"`** block with **`use_lockfile`**; distinct state keys **`bootstrap/remote-state/terraform.tfstate`** and **`bootstrap/github-oidc/terraform.tfstate`** in the **`stack`** state bucket.
+- **Deployment:** GitHub Actions **`terraform`** workflow (OIDC **`plan`** on PR/push **`main`**; **`apply`** only via **`workflow_dispatch`** with **Run apply** checked). Repo layout **`stack/`**, **`bootstrap/github-oidc/`**, **`docs/DEPLOYMENT.md`**. Removed local-only **`scripts/`** helpers and **`*.tfvars` example files`; **`stack/`** vars flow from **`TF_VAR_*`** secrets. Optional **`TF_VAR_RDS_BACKUP_RETENTION_PERIOD`** (e.g. **`0`** on Free Tier) overrides **`rds_backup_retention_period`** when set.
+- **Bootstrap:** **`bootstrap/`** provisions **S3 only**; **DynamoDB** lock table removed ( **`stack/`** uses S3 **`use_lockfile`** ). Re-**`apply`** **`bootstrap/`** to drop a legacy **`intentproof-tf-locks`** table when safe.
