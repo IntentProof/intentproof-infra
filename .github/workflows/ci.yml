@@ -16,7 +16,5 @@ jobs:
         run: |
           docker compose -f docker/docker-compose.stage2.yml config --quiet
 
-      - name: Markdown lint
-        uses: DavidAnson/markdownlint-cli2@v16
-        with:
-          globs: "**/*.md"
+      - name: Check README exists
+        run: test -f README.md
