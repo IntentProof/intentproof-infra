@@ -1,11 +1,15 @@
 # intentproof-infra
 
-Infrastructure definitions and local dev stacks for IntentProof.
+Reference infrastructure and local dev stacks for IntentProof.
 
 ## Scope
 
 - Local docker-compose stacks (Stage 2 dependencies)
-- Terraform and deployment scaffolding (as added)
+- Sanitized reference deployment material for self-hosters
+
+Production Terraform, secrets layout, IAM, and operational infrastructure live in the private repository:
+
+<https://github.com/IntentProof/intentproof-infra-private>
 
 ## Quick start (local)
 
