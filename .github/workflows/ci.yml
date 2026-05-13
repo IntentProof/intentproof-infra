@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate docker-compose syntax
+        run: |
+          docker compose -f docker/docker-compose.stage2.yml config --quiet
+
+      - name: Markdown lint
+        uses: DavidAnson/markdownlint-cli2@v16
+        with:
+          globs: "**/*.md"
