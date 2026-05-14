@@ -14,7 +14,7 @@ jobs:
 
       - name: Validate docker-compose syntax
         run: |
-          docker compose -f docker/docker-compose.stage2.yml config --quiet
+          docker compose -f docker/docker-compose.hosted-dev.yml config --quiet
 
       - name: Check README exists
         run: test -f README.md
