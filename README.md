@@ -17,6 +17,10 @@ From `docker/`:
 
 `docker-compose -f docker-compose.hosted-dev.yml up -d`
 
+## Contributing
+
+Issues welcome. See `CONTRIBUTING.md`.
+
 ## License
 
 Apache License 2.0 (`LICENSE`).
