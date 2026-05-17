@@ -23,7 +23,7 @@ jobs:
     permissions:
       contents: write
       id-token: write
-    uses: IntentProof/intentproof-tools/.github/workflows/release-build-sign.yml@349a1fb5c630187102b5756ca245096feff41027
+    uses: IntentProof/intentproof-tools/.github/workflows/release-build-sign.yml@b16c847be69708a50bdf6ee6113aa2c25cfe3c5d
     with:
       artifact_kind: generic
       subject_name: intentproof-security-fingerprint
