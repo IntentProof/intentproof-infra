@@ -1,0 +1,34 @@
+name: sign security key fingerprint
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: SemVer version label for the signed fingerprint manifest.
+        required: true
+        default: v0.0.0-security-key
+      release_ref:
+        description: Ref to check out when signing the fingerprint manifest.
+        required: true
+        default: refs/heads/main
+      attest_to_rekor:
+        description: Publish signatures and attestations to Rekor. Requires a SemVer tag release_ref.
+        required: true
+        type: boolean
+        default: false
+
+jobs:
+  sign-security-key-fingerprint:
+    name: "IntentProof Release: Sign Security Key Fingerprint"
+    permissions:
+      contents: write
+      id-token: write
+    uses: IntentProof/intentproof-tools/.github/workflows/release-build-sign.yml@12f13916db3e4fbab6f9a68a1be502a383e244dd
+    with:
+      artifact_kind: generic
+      subject_name: intentproof-security-fingerprint
+      release_version: ${{ inputs.release_version }}
+      release_ref: ${{ inputs.release_ref }}
+      artifact_paths: keys/intentproof-security.fingerprint.json
+      sbom_extra_paths: keys
+      attest_to_rekor: ${{ fromJSON(github.event.inputs.attest_to_rekor) }}

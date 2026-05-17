@@ -9,8 +9,8 @@ Do not commit private key material to this repository.
   `IntentProof Security <security@intentproof.io>`.
 - `intentproof-security.fingerprint.json`: JSON manifest containing the key
   fingerprint, user ID, creation time, expiry, and rotation notes.
-- Sigstore metadata for the fingerprint manifest, produced by the canonical
-  release signing workflow with `artifact_kind: generic`.
+- Sigstore metadata for the fingerprint manifest, produced by the
+  `sign security key fingerprint` workflow with `artifact_kind: generic`.
 
 ## Ceremony
 
@@ -21,11 +21,13 @@ Do not commit private key material to this repository.
 5. Keep the primary key on a hardware token or equivalent offline custody.
 6. Export only the armored public key to `intentproof-security.asc`.
 7. Record the fingerprint in `intentproof-security.fingerprint.json`.
-8. Sign the fingerprint manifest with the reusable release signing workflow.
+8. Sign the fingerprint manifest with the `sign security key fingerprint`
+   workflow.
 
 ## Rotation
 
-Before expiry or after any custody concern:
+Follow [`ROTATION.md`](ROTATION.md) before expiry or after any custody
+concern. At a high level:
 
 1. Generate the replacement key through the same ceremony.
 2. Sign a key-transition statement with the outgoing key when available.

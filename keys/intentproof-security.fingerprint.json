@@ -1,0 +1,16 @@
+{
+  "algorithm": "1",
+  "bits": 4096,
+  "created_at": "2026-05-17T12:46:56Z",
+  "expires_at": "2029-05-16T12:46:56Z",
+  "fingerprint": "E85B414BFFAD72CF1D978E9E1BADF8B2D348FE48",
+  "key_id": "1BADF8B2D348FE48",
+  "notes": "Public fingerprint manifest for the IntentProof security intake OpenPGP key. Private key material must never be committed.",
+  "public_key_file": "intentproof-security.asc",
+  "rotation": {
+    "cadence": "3 years",
+    "procedure": "Generate a replacement key through the documented offline ceremony, sign a transition statement with the outgoing key when available, and dual-publish old and new fingerprints during the overlap window."
+  },
+  "schema": "intentproof.security_key_fingerprint.v1",
+  "user_id": "IntentProof Security <security@intentproof.io>"
+}
