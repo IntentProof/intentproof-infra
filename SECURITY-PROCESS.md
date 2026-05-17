@@ -21,9 +21,10 @@ The intake owner records:
 
 The public OpenPGP key for encrypted reports is published at
 `keys/intentproof-security.asc` after the offline key ceremony described in
-[`keys/README.md`](keys/README.md). Until that key is published, use a private
-GitHub Security Advisory or send an initial unclassified message to arrange a
-secure channel.
+[`keys/README.md`](keys/README.md). Rotation is governed by
+[`keys/ROTATION.md`](keys/ROTATION.md). Until that key is published, use a
+private GitHub Security Advisory or send an initial unclassified message to
+arrange a secure channel.
 
 ## Severity Classification
 
