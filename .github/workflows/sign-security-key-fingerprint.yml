@@ -31,4 +31,4 @@ jobs:
       release_ref: ${{ inputs.release_ref }}
       artifact_paths: keys/intentproof-security.fingerprint.json
       sbom_extra_paths: keys
-      attest_to_rekor: ${{ inputs.attest_to_rekor }}
+      attest_to_rekor: ${{ fromJSON(github.event.inputs.attest_to_rekor) }}
