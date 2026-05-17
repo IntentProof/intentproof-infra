@@ -23,7 +23,6 @@ jobs:
     permissions:
       contents: write
       id-token: write
-      packages: write
     uses: IntentProof/intentproof-tools/.github/workflows/release-build-sign.yml@12f13916db3e4fbab6f9a68a1be502a383e244dd
     with:
       artifact_kind: generic
